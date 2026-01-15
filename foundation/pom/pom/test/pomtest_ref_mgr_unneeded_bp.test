@@ -1,0 +1,201 @@
+@* @<COPYRIGHT>@
+@*==============================================================================
+@* Copyright 2022.
+@* Siemens Product Lifecycle Management Software Inc.
+@* All Rights Reserved.
+@*==============================================================================
+@* @<COPYRIGHT>@
+@*
+@* Test reference_manager -remove_unneeded_bp functionality.  
+@*
+@*==============================================================================
+timing on
+timing start
+
+POM_start_modify (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+POM_class_id_of_class       ( "POM_object", po_c_tag )
+
+
+@* Create a "flat" subclass of POM_object.
+create_unique_classname unneeded_flat_class_name RM_UNNEEDED_FLAT
+POM_define_class (po_c_tag,    unneeded_flat_class_name, '', 65536, flat_c_tag)
+POM_define_attr  (flat_c_tag, 'x_string', POM_string, 32, NULLCLASS,  1, POM_null_is_valid, x_a_tag)
+POM_save_class   (flat_c_tag)
+
+set_variable tar_class string unneeded_flat_class_name
+
+create_unique_classname class_name RM_UNNEEDED_BKPTR
+AOS_create_GEN_class        ( class_name, 'POM_typed_reference', 10, true, n_groupa, groupa )
+POM_attr_id_of_attr         ( 'a_vla', class_name, vla_tag )
+set_variable t1_tag tag     groupa[0]
+POM_tag_to_uid              ( t1_tag, t1_uid )
+set_variable t2_tag tag     groupa[1]
+POM_tag_to_uid              ( t2_tag, t2_uid )
+
+@* 
+@* Make sure there are currently NO unneeded backpointers. 
+@*
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -commit'
+print_variable cmd
+system cmd
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -cnt=0'
+print_variable cmd
+system cmd
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -alt -commit'
+print_variable cmd
+system cmd
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -alt -cnt=0'
+print_variable cmd
+system cmd
+
+@*
+@* Test that a POM_BACKPOINTER with a bad from_uid value is removed.
+@*
+set_variable sql string     "INSERT INTO POM_BACKPOINTER (from_uid, from_class, to_uid, to_class, bp_count) values ('SlechtaSlechta',1,'"
+set_variable sql string     sql + t1_uid 
+set_variable sql string     sql + "',1,99)"
+print_variable sql
+AOS_utility_tx_start(1)     
+EIM_exec_imm( sql,          "set target test data")
+AOS_utility_tx_commit(1)
+AOS_utility_tx_end(1)
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -cnt=1  -commit'
+print_variable cmd
+system cmd
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -cnt=0'
+print_variable cmd
+system cmd
+
+@*
+@* Test that a POM_BACKPOINTER with a bad to_uid value is removed.
+@*
+set_variable sql string     "INSERT INTO POM_BACKPOINTER (from_uid, from_class, to_uid, to_class, bp_count) values ('"
+set_variable sql string     sql + t2_uid 
+set_variable sql string     sql + "',1,'SlechtaSlechta',1,99)"
+print_variable sql
+AOS_utility_tx_start(1)     
+EIM_exec_imm( sql,          "set target test data")
+AOS_utility_tx_commit(1)
+AOS_utility_tx_end(1)
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -alt -cnt=1'
+print_variable cmd
+system cmd
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -v -alt -cnt=1  -commit'
+print_variable cmd
+system cmd
+
+@*
+@* Test that POM_BACKPOINTER.from_uid stubbed values are NOT removed.
+@*  Test specifics. 
+@*  1) 4000 backpointers (from_uids) pointing to the target class.
+@*  2) 1000 records in the PPOM_STUB class with pobject_class = target class.
+@*  3) No records in the target class. 
+@*  Note:  The "from_uids"  Should not be impacted by PPOM_STUB records.  I.e. all 4000 backpointers should be deleted.
+@*
+lprintf                     "#### Test that POM_BACKPOINTER.from_uid stubbed values are NOT removed."
+AOS_populate_bps_stubs_cls  ( 'delete', nulltag, 0, 0, 0, 0, false, tar_class, false)
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 410, 0, 4000, 0, false, tar_class, false)
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 410, 3, 0, 1000, false, tar_class, false)
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -cnt=4000 -commit'
+print_variable cmd
+system cmd
+
+AOS_populate_bps_stubs_cls  ( 'delete', nulltag, 0, 0, 0, 0, false, tar_class, false)
+
+@*
+@* Test that POM_BACKPOINTER.to_uid - stubbed UIDs and existing object UIDs are NOT removed.
+@*  Test specifics. 
+@*  1) 8000 backpointers (to_uids) pointing to the target class.
+@*  2) 1000 records in the PPOM_STUB class with pobject_class = target class, WITH NO records in the target class. 
+@*  3) 600 records in the PPOM_STUB class with pobject_class = target class, WITH records in the target class.
+@*  Note: The "to_uids" will be impacted by PPOM_STUB records. 
+@*        Expected results: The 600 PPOM_STUB records with records in the target class will be ignored.
+@*                          The 1000 POM_STUB records without recods in the target class will not allow backpointers to be deleted. 
+@*                          One unneeded backpointer is removed with -uid= option 
+@*                          The remaining 6,399 backpointers are expected to be removed as they are not needed.
+@*
+lprintf                     "#### Test that POM_BACKPOINTER.to_uid stubbed values are NOT removed."
+AOS_populate_bps_stubs_cls  ( 'delete', nulltag, 0, 0, 0, 0, true, tar_class, false)
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 20000, 0, 8000, 0, true, tar_class, false)
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 20000, 7, 0, 1000, true, tar_class, false)
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 20003, 7, 0, 600,  true, tar_class, true)
+
+@* Test -uid= with a UID that does NOT exist in the database.
+AOS_int_to_fake_uid         ( 20001, fake_from_uid, fake_to_uid)
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -cnt=0 -alt -commit -uid='
+set_variable cmd string     cmd + 'SlechtxSlechta'
+print_variable cmd
+system cmd
+
+@* Test that we can removed the backpointers for a single uid specified with the -uid= option.
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -cnt=1 -alt -commit -uid='
+set_variable cmd string     cmd + fake_to_uid
+@[ $OSFAMILY -in ( nt ) ] set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+@* Test that we CAN'T removed the backpointer for a single uid that is stubbed and exists in the target class (tar_class).
+AOS_int_to_fake_uid         ( 20003, fake_from_uid, fake_to_uid)
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -cnt=0 -alt -commit -uid='
+set_variable cmd string     cmd + fake_to_uid
+@[ $OSFAMILY -in ( nt ) ]   set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+set_variable cmd string     'reference_manager -remove_unneeded_bp -u=otto -p=matic -g=sys_admin -cnt=6399 -alt -commit'
+print_variable cmd
+system cmd
+
+AOS_populate_bps_stubs_cls  ( 'delete', nulltag, 0, 0, 0, 0, false, tar_class, false)
+
+@*
+@* A quick test for -find_stub
+@
+AOS_populate_bps_stubs_cls  ( 'insert', t1_tag, 29900, 0, 15, 15, true, tar_class, true)
+AOS_int_to_fake_uid         ( 29909, fake_from_uid, fake_to_uid)
+AOS_int_to_fake_uid         ( 29901, fake_from_uid, fake_to_uid02)
+AOS_int_to_fake_uid         ( 29906, fake_from_uid, fake_to_uid03)
+AOS_int_to_fake_uid         ( 29908, fake_from_uid, fake_to_uid04)
+
+@* Test that we find the unique target uid 
+set_variable cmd string     'reference_manager -find_stub -u=otto -p=matic -g=sys_admin -cnt=1 -uid='
+set_variable cmd string     cmd + fake_to_uid 
+@[ $OSFAMILY -in ( nt ) ] set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+@* Test that we can find three of the four specified UIDS. 
+set_variable cmd string     'reference_manager -find_stub -u=otto -p=matic -g=sys_admin -cnt=3 -uid=SlechtxSlechta -uid='
+set_variable cmd string     cmd + fake_to_uid02
+set_variable cmd string     cmd + ' -uid=' 
+set_variable cmd string     cmd + fake_to_uid03 
+set_variable cmd string     cmd + ' -uid='
+set_variable cmd string     cmd + fake_to_uid04
+@[ $OSFAMILY -in ( nt ) ] set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+AOS_populate_bps_stubs_cls  ( 'delete', nulltag, 0, 0, 0, 0, false, tar_class, false)
+
+@*
+@* Clean up and get out
+@*
+
+AOS_drop_GEN_class          ( class_name )
+AOS_drop_GEN_class          ( unneeded_flat_class_name )
+
+POM_stop( true)
+stop
+

@@ -1,0 +1,88 @@
+@* @<COPYRIGHT>@
+@*==============================================================================
+@* Copyright 2023.
+@* Siemens Product Lifecycle Management Software Inc.
+@* All Rights Reserved.
+@*==============================================================================
+@* @<COPYRIGHT>@
+@*
+@* Test reference_manager's ability to find invalid class IDs within reference attributes.
+@*
+@*==============================================================================
+timing on
+timing start
+
+POM_start_modify (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+
+@*
+@* Create flattened class with 250 references. 
+@* Note the first object does not have a reference so we actually need 251 objects
+create_unique_classname     class_name RF_MGR_IV_CIDS
+AOS_create_GEN_class        ( class_name, 'null', 251, true, n_groupa, groupa );
+
+@*
+@* Convert the RF_MGR_IV_CLIDS class into a flattened class.
+set_variable cmd string     'flatten_class -u=otto -p=matic -g=sys_admin -flat '
+set_variable cmd string     cmd + class_name
+print_variable cmd
+system cmd
+
+@*
+@* Re-login so that we get the latest schema changes.
+POM_stop(true)
+POM_start_modify            (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+POM_class_id_of_class       ( class_name, class_tag )
+DDS_table_name              ( class_tag, class_table )
+
+@* 
+@* Corrupt the class IDs in the from_class column of the POM_BACKPOINTER table. 
+AOS_utility_tx_start(1) 
+set_variable cmd string     "UPDATE POM_BACKPOINTER SET from_class = 32000 WHERE from_uid IN (SELECT puid FROM "
+set_variable cmd string     cmd + class_table
+set_variable cmd string     cmd + ")"
+print_variable cmd
+EIM_exec_imm( cmd, "corrupt POM_BACKPOINTER.from_class values")
+AOS_utility_tx_commit(1)
+AOS_utility_tx_end(1)
+
+@* 
+@* Test that reference_manager will actually dump out all the flattened classes.
+set_variable cmd string     'reference_manager -validate_cids -u=otto -p=matic -g=sys_admin -aos=515029 '
+print_variable cmd
+system cmd
+
+@* 
+@* Test that reference_manager can identiy the first 100 problems. 
+set_variable cmd string     'reference_manager -validate_cids -u=otto -p=matic -g=sys_admin -cnt=100 -vc='
+set_variable cmd string     cmd + class_name
+print_variable cmd
+system cmd
+
+@* 
+@* Test that reference_manager can identiy the entire 250 problems. 
+set_variable cmd string     'reference_manager -validate_cids -u=otto -p=matic -g=sys_admin -max=300 -cnt=250 -vc='
+set_variable cmd string     cmd + class_name
+print_variable cmd
+system cmd
+
+@* 
+@* Test that "minimal" functionality works (does not write SQL to console). 
+set_variable cmd string     'reference_manager -validate_cids -u=otto -p=matic -g=sys_admin -m -vc='
+set_variable cmd string     cmd + class_name
+print_variable cmd
+system cmd
+
+@* 
+@* Test that -o=class_name works, it does not make much sense, so not documented.
+set_variable cmd string     'reference_manager -validate_cids -u=otto -p=matic -g=sys_admin -m -vc='
+set_variable cmd string     cmd + class_name
+set_variable cmd string     cmd + ' -o=POM_stub'
+print_variable cmd
+system cmd
+
+
+AOS_drop_GEN_class           ( class_name )
+
+POM_stop(true)
+stop
+

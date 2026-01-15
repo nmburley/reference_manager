@@ -1,0 +1,903 @@
+@* @<COPYRIGHT>@
+@*=============================================================================
+@* Copyright 2017.
+@* Siemens Product Lifecycle Management Software Inc.
+@* All Rights Reserved.
+@*=============================================================================
+@* @<COPYRIGHT>@
+@*
+@* File description: Test Reference Manager functionality.
+@*
+@*
+@*=================================================================================================================================
+@* Date         Name                    Description of Change
+@*
+@* 12-Dec-2016  Tim Slechta             Initial version
+@* $HISTORY$
+@*=================================================================================================================================
+
+@* -------------------------------------------------------------------------
+@* Description: 
+@* -------------------------------------------------------------------------
+   timing on
+   timing start
+
+   @* Because b rtkit does not include executables that are only for autotest purposes
+   @* we simply will not call the utility_license executable, except for windows OS.
+   set_variable winnt string "no"
+   @[ $OSFAMILY -in ( nt ) ]   set_variable winnt string "yes"
+
+   set_variable bnt_temp string "$IMAN_TMP_DIR"
+
+   if bnt_temp eq "\$IMAN_TMP_DIR"
+      set_variable bnt_temp string "$TEMP"
+   endif
+
+   if bnt_temp eq "\$TEMP"
+      set_variable bnt_temp string "$TMP"
+   endif
+
+   @[ $OSFAMILY -in ( unix ) ] set_variable   lic_key_file string bnt_temp + "/lic_file.txt"
+   @[ $OSFAMILY -in ( nt ) ]   set_variable   lic_key_file string bnt_temp + "\\lic_file.txt"
+
+   setenv LIC_FILE lic_key_file
+   if winnt eq "yes"
+	  system 'utility_license -create -lic_file=$LIC_FILE reference_manager'
+   endif
+
+   POM_start_modify (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+   POM_class_id_of_class ("POM_application_object", the_world)
+   POM_class_id_of_class ("POM_object", the_larger_world)
+@*
+@*  define Reference_Test_Class class
+@*
+   POM_define_class (the_world , "Reference_Test_Class", "", 0, new_class)
+
+   POM_define_attr (new_class, "a_ut_ref",      POM_untyped_reference,  0, NULLCLASS, 1,  POM_is_unique, a_ut_ref)
+   POM_define_attr (new_class, "a_t_ref",       POM_typed_reference,    0, the_world, 1,  POM_is_unique, a_t_ref)
+   POM_define_attr (new_class, "a_e_ref",       POM_external_reference, 0, NULLCLASS, 1,  POM_is_unique, a_e_ref)
+   POM_define_attr (new_class, "a_string",      POM_string,            32, NULLCLASS, 1,  POM_is_unique, a_string)
+
+   POM_define_attr (new_class, "a_ut_ref_la",   POM_untyped_reference,  0, NULLCLASS, 10, POM_null_is_valid, a_ut_ref_la)
+   POM_define_attr (new_class, "a_t_ref_la",    POM_typed_reference,    0, the_world, 10, POM_null_is_valid, a_t_ref_la)
+   POM_define_attr (new_class, "a_e_ref_la",    POM_external_reference, 0, NULLCLASS, 10, POM_null_is_valid, a_e_ref_la)
+   POM_define_attr (new_class, "a_string_la",   POM_string,            32, NULLCLASS, 10, POM_null_is_valid, a_string_la)
+
+   POM_define_attr (new_class, "a_ut_ref_sa",   POM_untyped_reference,  0, NULLCLASS, 3,  POM_null_is_valid, a_ut_ref_sa)
+   POM_define_attr (new_class, "a_t_ref_sa",    POM_typed_reference,    0, the_world, 3,  POM_null_is_valid, a_t_ref_sa)
+   POM_define_attr (new_class, "a_e_ref_sa",    POM_external_reference, 0, NULLCLASS, 3,  POM_null_is_valid, a_e_ref_sa)
+   POM_define_attr (new_class, "a_string_sa",   POM_string,            32, NULLCLASS, 3,  POM_null_is_valid, a_string_sa)
+
+   POM_define_attr (new_class, "a_ut_ref_vla",  POM_untyped_reference,  0, NULLCLASS, -1, POM_null_is_valid, a_ut_ref_vla)
+   POM_define_attr (new_class, "a_t_ref_vla",   POM_typed_reference,    0, the_world, -1, POM_null_is_valid, a_t_ref_vla)
+   POM_define_attr (new_class, "a_e_ref_vla",   POM_external_reference, 0, NULLCLASS, -1, POM_null_is_valid, a_e_ref_vla)
+   POM_define_attr (new_class, "a_string_vla",  POM_string,            32, NULLCLASS, -1, POM_null_is_valid, a_string_vla)
+
+   POM_save_class (new_class)
+
+@*
+@*  Define No_Ref_Attrs_Class class - MUST CONTAIN NO REFERENCE ATTRIBUTES!
+@*
+   POM_define_class (new_class,    "No_Ref_Attrs_Class", "", 0, no_ref_class)
+   POM_define_attr  (no_ref_class, "x_string",      POM_string,            32, NULLCLASS, 1,  POM_null_is_valid, x_string)
+   POM_save_class   (no_ref_class)
+
+ @*
+ @* Create third LWO referencing class
+ @*
+   POM_define_class           ( the_larger_world, "Reference_Test_LWO_3", "", 0, new_lwo_3)
+ @*POM_define_attr            ( new_lwo_3,        "c_t_ref_sa",   POM_typed_reference,    0, the_world, 3,  POM_null_is_valid, c_t_ref_sa)
+   POM_define_attr            ( new_lwo_3,        "c_t_ref",      POM_typed_reference,    0, the_larger_world, 1,  POM_null_is_valid, c_t_ref)
+   POM_save_class             ( new_lwo_3 );
+
+ @*
+ @* Create second class
+ @*
+   POM_define_class           ( the_world ,       "Reference_Test_Class_2", "", POM_uninheritable_class, referenced_class)
+   POM_define_attr            ( referenced_class, "b_string",             POM_string,            50, NULLTAG,    1, POM_null_is_valid, b_string )
+   POM_define_attr            ( referenced_class, "b_t_nb_ref",           POM_typed_reference,    0, the_world,  1, POM_null_is_valid, b_t_nb_ref )  
+   POM_define_attr            ( referenced_class, "b_ut_ref_vla_999786",  POM_untyped_reference,  0, NULLCLASS, -1, POM_null_is_valid, b_ut_ref_vla_999786 )
+   POM_define_attr            ( referenced_class, "b_string_vla_999786",  POM_string,            50, null_tag,  -1, POM_null_is_valid, b_string_vla_999786 )
+   POM_save_class             ( referenced_class );
+   POM_set_attribute_property ( referenced_class,  b_t_nb_ref, POM_attr_no_pom_backpointer )
+
+   POM_stop( false )
+
+@* Update schema file for flatten class operation
+   system "install -regen_schema_file -u=otto -p=matic -g=sys_admin" 
+
+@* Flatten the test LWO class
+   system "flatten_class  -u=otto -p=matic -g=sys_admin  Reference_Test_LWO_3"
+
+@* Update the current POM data dictionary.
+@* system "install -regen_schema_file -u=otto -p=matic -g=sys_admin" 
+   POM_regen_schema_file ( HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP )
+   POM_stop( false )
+
+@* First test to ensure that reference_manager and the AOS test system can handle dollar sign ($) and percent(%) on the command line. 
+@* reference_manager -find_ref -u=user -p=pwd | -pf=pwdfile -g=group -uid=uid [-c=class] [-a=attribute] [-i] [-n] [-o=class] [-v]
+   set_variable command string "reference_manager -find_ref -u=otto -p=matic -g=sys_admin -uid=a$ROOTa%root%z -o=Reference_Test_Class -v"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   AOS_escape_char('\\', '%', command2, command3)
+   print_variable command3
+   system command3
+
+   set_variable command string "reference_manager -validate_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:wUZ1w$$aAAgcBA -to=Reference_Test_Class:wUW1w$$aAAgcBA"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   AOS_escape_char('\\', '%', command2, command3)
+   print_variable command3
+   system command3
+   
+
+
+   POM_start_modify (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+   
+   POM_class_id_of_class ("Reference_Test_Class", new_class )
+   POM_attr_id_of_attr   ("a_ut_ref",            "Reference_Test_Class", a_ut_ref )
+   POM_attr_id_of_attr   ("a_t_ref",             "Reference_Test_Class", a_t_ref )
+   POM_attr_id_of_attr   ("a_e_ref",             "Reference_Test_Class", a_e_ref )
+   POM_attr_id_of_attr   ("a_string",            "Reference_Test_Class", a_string )
+   POM_attr_id_of_attr   ("a_ut_ref_sa",         "Reference_Test_Class", a_ut_ref_sa )
+   POM_attr_id_of_attr   ("a_t_ref_sa",          "Reference_Test_Class", a_t_ref_sa )
+   POM_attr_id_of_attr   ("a_e_ref_sa",          "Reference_Test_Class", a_e_ref_sa )
+   POM_attr_id_of_attr   ("a_string_sa",         "Reference_Test_Class", a_string_sa )
+   POM_attr_id_of_attr   ("a_ut_ref_la",         "Reference_Test_Class", a_ut_ref_la )
+   POM_attr_id_of_attr   ("a_t_ref_la",          "Reference_Test_Class", a_t_ref_la )
+   POM_attr_id_of_attr   ("a_e_ref_la",          "Reference_Test_Class", a_e_ref_la )
+   POM_attr_id_of_attr   ("a_string_la",         "Reference_Test_Class", a_string_la )
+   POM_attr_id_of_attr   ("a_ut_ref_vla",        "Reference_Test_Class", a_ut_ref_vla )
+   POM_attr_id_of_attr   ("a_t_ref_vla",         "Reference_Test_Class", a_t_ref_vla )
+   POM_attr_id_of_attr   ("a_e_ref_vla",         "Reference_Test_Class", a_e_ref_vla )
+   POM_attr_id_of_attr   ("a_string_vla",        "Reference_Test_Class", a_string_vla )
+
+   POM_class_id_of_class ("No_Ref_Attrs_Class", no_ref_class )
+   POM_attr_id_of_attr   ("x_string",           "No_Ref_Attrs_Class", x_string )
+
+   POM_class_id_of_class ("Reference_Test_Class_2", referenced_class )
+   POM_attr_id_of_attr   ("b_string",            "Reference_Test_Class_2", b_string )
+   POM_attr_id_of_attr   ("b_t_nb_ref",          "Reference_Test_Class_2", b_t_nb_ref )
+   POM_attr_id_of_attr   ("b_ut_ref_vla_999786", "Reference_Test_Class_2", b_ut_ref_vla_999786 )
+   POM_attr_id_of_attr   ("b_string_vla_999786", "Reference_Test_Class_2", b_string_vla_999786 )
+
+   POM_class_id_of_class ("Reference_Test_LWO_3", new_lwo_3)
+@* POM_attr_id_of_attr   ("c_t_ref_sa",           "Reference_Test_LWO_3", c_t_ref_sa )
+   POM_attr_id_of_attr   ("c_t_ref",              "Reference_Test_LWO_3", c_t_ref )
+   
+
+@* Create a target object to be referenced (the referenced object)
+   POM_create_instance  ( referenced_class, ref_inst1 )
+   POM_set_attr_string  ( 1, { ref_inst1 }, b_string, 'target_string_1' )
+   POM_set_attr_null    ( 1, { ref_inst1 }, b_t_nb_ref )
+   POM_save_instances   ( 1, { ref_inst1 }, false )
+   POM_tag_to_uid       ( ref_inst1, ref_inst1_uid )
+   POM_create_instance  ( referenced_class, ref_inst2 )
+   POM_set_attr_string  ( 1, { ref_inst2 }, b_string, 'target_string_2' )
+   POM_set_attr_null    ( 1, { ref_inst2 }, b_t_nb_ref )
+   POM_save_instances   ( 1, { ref_inst2 }, true )
+   POM_tag_to_uid       ( ref_inst2, ref_inst2_uid )
+
+
+@* Create a referencing object (an object that is referencing the referenced object)
+   POM_create_instance     ( new_class, inst1 )
+   POM_set_attr_tag        ( 1, { inst1 }, a_ut_ref, ref_inst1 )
+   POM_set_attr_tag        ( 1, { inst1 }, a_t_ref,  ref_inst1 )
+   POM_set_attr_tag        ( 1, { inst1 }, a_e_ref,  ref_inst1 )
+   POM_set_attr_string     ( 1, { inst1 }, a_string, 'some_data' )
+
+   POM_set_attr_tags       ( 1, { inst1 }, a_ut_ref_la, 0, 10, { inst1,inst1,inst1,inst1,inst1,inst1,inst1,inst1,inst1,ref_inst1 } )
+   POM_set_attr_tags       ( 1, { inst1 }, a_t_ref_la,  0, 10, { inst1,inst1,inst1,inst1,inst1,inst1,inst1,inst1,ref_inst1,inst1 } )
+   POM_set_attr_tags       ( 1, { inst1 }, a_e_ref_la,  0, 10, { inst1,inst1,inst1,inst1,inst1,inst1,inst1,ref_inst1,inst1,inst1 } )
+   POM_set_attr_strings    ( 1, { inst1 }, a_string_la, 0, 10, { "x1","x2","x3","x4","x5","x6","x7","x8","x9","x10"} )
+
+   POM_set_attr_tags       ( 1, { inst1 }, a_ut_ref_sa, 0, 3, { inst1,ref_inst1,inst1 } )
+   POM_set_attr_tags       ( 1, { inst1 }, a_t_ref_sa,  0, 3, { ref_inst1,inst1,inst1 } )
+   POM_set_attr_tags       ( 1, { inst1 }, a_e_ref_sa,  0, 3, { inst1,inst1,ref_inst1 } )
+   POM_set_attr_strings    ( 1, { inst1 }, a_string_sa, 0, 3, { "x1","x2","x3"} )
+   POM_save_instances      ( 1, { inst1 }, true )
+   POM_tag_to_uid          ( inst1, orig_inst1_uid )
+
+   @* Create a No_Ref_Attrs_Class referencing object (an object that is referencing the referenced object)
+   POM_create_instance     ( no_ref_class, noref1 )
+   POM_set_attr_tag        ( 1, { noref1 }, a_ut_ref, ref_inst2 )
+   POM_set_attr_tag        ( 1, { noref1 }, a_t_ref,  ref_inst2 )
+   POM_set_attr_tag        ( 1, { noref1 }, a_e_ref,  noref1 )
+   POM_set_attr_string     ( 1, { noref1 }, a_string, 'some_other_data' )
+
+   POM_set_attr_tags       ( 1, { noref1 }, a_ut_ref_la, 0, 10, { noref1,noref1,noref1,noref1,noref1,noref1,noref1,noref1,noref1,ref_inst2 } )
+   POM_set_attr_tags       ( 1, { noref1 }, a_t_ref_la,  0, 10, { noref1,noref1,noref1,noref1,noref1,noref1,noref1,noref1,ref_inst2,noref1 } )
+   POM_set_attr_tags       ( 1, { noref1 }, a_e_ref_la,  0, 10, { noref1,noref1,noref1,noref1,noref1,noref1,noref1,ref_inst1,noref1,noref1 } )
+   POM_set_attr_strings    ( 1, { noref1 }, a_string_la, 0, 10, { "x1","x2","x3","x4","x5","x6","x7","x8","x9","x10"} )
+
+   POM_set_attr_tags       ( 1, { noref1 }, a_ut_ref_sa, 0, 3, { noref1,ref_inst2,noref1 } )
+   POM_set_attr_tags       ( 1, { noref1 }, a_t_ref_sa,  0, 3, { ref_inst2,noref1,noref1 } )
+   POM_set_attr_tags       ( 1, { noref1 }, a_e_ref_sa,  0, 3, { noref1,noref1,ref_inst1 } )
+   POM_set_attr_strings    ( 1, { noref1 }, a_string_sa, 0, 3, { "x1","x2","x3"} )
+
+   POM_set_attr_tags       ( 1, { noref1 }, a_ut_ref_vla, 0, 3, { noref1,ref_inst2,noref1 } )
+   POM_set_attr_tags       ( 1, { noref1 }, a_t_ref_vla,  0, 3, { noref1,ref_inst2,noref1 } )
+
+   POM_set_attr_string     ( 1, { noref1 }, x_string, 'x_string some_data' )
+   POM_save_instances      ( 1, { noref1 }, true )
+   POM_tag_to_uid          ( noref1, noref1_uid )
+
+   @* Create a LWO object to be used for setting up -correct_pb with a missing object.
+   POM_create_instance     ( new_lwo_3, missing_lwo )
+   POM_set_attr_tag        ( 1, { missing_lwo }, c_t_ref, ref_inst1 )
+   POM_save_instances      ( 1, { missing_lwo }, true )
+   POM_tag_to_uid          ( missing_lwo, missing_lwo_uid )
+
+@* Create a LWO referencing object 
+   POM_create_instance     ( new_lwo_3, inst_lwo_1 )
+@* POM_set_attr_tags       ( 1, { inst_lwo_1 }, c_t_ref_sa, 0, 3, { inst1,inst1,inst1 } )
+   POM_set_attr_tag        ( 1, { inst_lwo_1 }, c_t_ref, inst1 )
+   POM_save_instances      ( 1, { inst_lwo_1 }, true )
+   POM_tag_to_uid          ( inst_lwo_1, inst_lwo_1_uid )
+
+@* Create two additional lwo_3 instances for additional testing. 
+   POM_create_instance     ( new_lwo_3, inst_lwo_92 )
+   POM_set_attr_null       ( 1, { inst_lwo_92 }, c_t_ref )
+   POM_save_instances      ( 1, { inst_lwo_92 }, true )
+   POM_tag_to_uid          ( inst_lwo_92, inst_lwo_92_uid )
+
+   POM_create_instance     ( new_lwo_3, inst_lwo_91 )
+   POM_set_attr_tag        ( 1, { inst_lwo_91 }, c_t_ref, inst_lwo_92 )
+   POM_save_instances      ( 1, { inst_lwo_91 }, true )
+   POM_tag_to_uid          ( inst_lwo_91, inst_lwo_91_uid )
+
+@*Create a second object for misc testing. 
+   POM_create_instance     ( referenced_class, ref_inst10 )
+   POM_set_attr_string     ( 1, { ref_inst10 }, b_string, '999786_10_referenced' )
+   POM_set_attr_null       ( 1, { ref_inst10 }, b_t_nb_ref )
+   POM_append_attr_strings ( 1, { ref_inst10 }, b_string_vla_999786,  1, { '999786_10_referenced' })
+   POM_save_instances      ( 1, { ref_inst10 }, true )
+   POM_tag_to_uid          ( ref_inst10, inst10_uid )
+
+   POM_create_instance     ( referenced_class, ref_inst11 )
+   POM_set_attr_string     ( 1, { ref_inst11 }, b_string, '999786_10_referencing' )
+   POM_set_attr_null       ( 1, { ref_inst11 }, b_t_nb_ref )
+   POM_append_attr_tags    ( 1, { ref_inst11 }, b_ut_ref_vla_999786,  1, { ref_inst10 })
+   POM_append_attr_strings ( 1, { ref_inst11 }, b_string_vla_999786,  1, { '999786_10_referencing' })
+   POM_save_instances      ( 1, { ref_inst11 }, true )
+   POM_tag_to_uid          ( ref_inst11, inst11_uid )
+  
+   POM_create_instance     ( referenced_class, ref_inst19 )
+   POM_set_attr_string     ( 1, { ref_inst19 }, b_string, '999786_19_deleted' )
+   POM_set_attr_null       ( 1, { ref_inst19 }, b_t_nb_ref )
+   POM_append_attr_tags    ( 1, { ref_inst19 }, b_ut_ref_vla_999786,  1, { ref_inst10 })
+   POM_append_attr_strings ( 1, { ref_inst19 }, b_string_vla_999786,  1, { '999786_19_deleted' })
+   POM_save_instances      ( 1, { ref_inst19 }, true )
+   POM_tag_to_uid          ( ref_inst19, inst19_uid )
+
+   set_variable orig_bp_count int 1
+   aos_get_bp_count( inst11_uid, inst10_uid, aint)
+   check_variable aint orig_bp_count
+
+@*
+@* Execute Tests here.
+@*
+   set_variable command string "reference_manager -find_class -u=otto -p=matic -g=sys_admin -uid=" + ref_inst2_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   AOS_escape_char('\\', '%', command2, command3)
+   print_variable command3
+   system command3
+
+   set_variable command string "reference_manager -str_len_meta -u=otto -p=matic -g=sys_admin -c=Reference_Test_Class"
+   print_variable command
+   system command
+
+   set_variable command string "reference_manager -str_len_val -u=otto -p=matic -g=sys_admin -from=POM_object:timestamp"
+   @[ $TC_DB_PLATFORM -in ( ORACLE POSTGRESQL) ] set_variable command string command + " -aos=515005"
+   print_variable command
+   system command
+
+   set_variable command string "reference_manager -where_ref -u=otto -p=matic -g=sys_admin -uid=" + ref_inst2_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   AOS_escape_char('\\', '%', command2, command3)
+   print_variable command3
+   system command3
+   
+   set_variable command string "reference_manager -find_ref -u=otto -p=matic -g=sys_admin -debug -uid=" + ref_inst2_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   AOS_escape_char('\\', '%', command2, command3)
+   print_variable command3
+   system command3
+
+@* ===================
+@* LWO testing
+@* ===================
+   POM_class_id_of_class   ("POM_imc", imc_class )
+   POM_attr_id_of_attr     ("name",           "POM_imc", imc_name )
+   POM_attr_id_of_attr     ("site_id",        "POM_imc", imc_site_id )
+   POM_attr_id_of_attr     ("dbms",           "POM_imc", imc_dbms)
+   POM_attr_id_of_attr     ("user_id",        "POM_imc", imc_user_id )
+   POM_attr_id_of_attr     ("password",       "POM_imc", imc_password )
+   POM_attr_id_of_attr     ("connect_string", "POM_imc", connect_string )
+   POM_attr_id_of_attr     ("imc_node_name",  "POM_imc", imc_imc_node_name )
+   POM_attr_id_of_attr     ("imc_ods_site",   "POM_imc", imc_imc_ods_site )
+   POM_attr_id_of_attr     ("geography",      "POM_imc", imc_geography )
+   POM_attr_id_of_attr     ("http_site_node", "POM_imc", imc_http_site_node )
+   POM_attr_id_of_attr     ("gms_url",        "POM_imc", imc_gms_url )
+
+   POM_create_instance     ( imc_class, imc_inst1 )
+   POM_set_attr_string     ( 1, { imc_inst1 }, imc_name, "Test_imc_name_004" )
+   POM_set_attr_int        ( 1, { imc_inst1 }, imc_site_id, 11004 )
+   POM_set_attr_int        ( 1, { imc_inst1 }, imc_dbms, 0 )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_user_id )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_password )
+   POM_set_attr_null       ( 1, { imc_inst1 }, connect_string )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_imc_node_name )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_imc_ods_site )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_geography )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_http_site_node )
+   POM_set_attr_null       ( 1, { imc_inst1 }, imc_gms_url )
+   POM_save_instances      ( 1, { imc_inst1 }, true )
+   POM_tag_to_uid          ( imc_inst1, imc_inst1_uid )
+
+   set_variable command string "reference_manager -validate_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:" + inst_lwo_1_uid
+   set_variable command string command + " -to=Reference_Test_Class:"
+   set_variable command string command + orig_inst1_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   @* NMB checking the reference to cover a uncovered functions
+   set_variable command string "reference_manager -check_ref -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:" + inst_lwo_1_uid
+   set_variable command string command + " -to=Reference_Test_Class:"
+   set_variable command string command + orig_inst1_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   POM_load_instances      ( 1, { inst_lwo_1 }, new_lwo_3 , POM_modify_lock )
+   POM_set_attr_tag        ( 1, { inst_lwo_1 }, c_t_ref, imc_inst1 )
+   POM_save_instances      ( 1, { inst_lwo_1 }, true )
+
+   set_variable command string "UPDATE PREFERENCE_TEST_LWO_3 SET rowning_siteu ='" + imc_inst1_uid
+   set_variable command string command + "', rowning_sitec = -1 WHERE puid = '"
+   set_variable command string command + inst_lwo_1_uid
+   set_variable command string command + "'"
+
+@* NOTE:
+@* The following 4 statements DO NOT really commit???
+@* These 4 statements cause the following "system" command 
+@* to timeout on the select for update (MS SQL server). 
+@* For now we'll just comment these out, but would like to 
+@* have this functional so we can test reference counting on LWOs.
+@*   AOS_utility_tx_start(1)
+@*   EIM_exec_imm( command, "set owining site UID")
+@*   AOS_utility_tx_commit(1)
+@*   AOS_utility_tx_end(1)
+
+   set_variable command string "reference_manager -validate_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:" + inst_lwo_1_uid
+   set_variable command string command + " -to=POM_imc:"
+   set_variable command string command + imc_inst1_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   POM_load_instances      ( 1, { inst_lwo_1 }, new_lwo_3 , POM_modify_lock )
+   POM_set_attr_tag        ( 1, { inst_lwo_1 }, c_t_ref, inst1 )
+   POM_save_instances      ( 1, { inst_lwo_1 }, true )
+
+   POM_delete_instances    ( 1 , { imc_inst1 } )
+
+@* ===================
+@* Tests added May 6, 2020
+
+@* Test 20200506 - 1
+@* Validate that reference manager can correctly count references while traversing up the hierarchy. 
+@* The noref1 instance has 8 references to the ref_inst2 instance. They are as follow. 
+@* 1 untyped  scalar reference
+@* 1 typed    scalar reference 
+@* 1 untyped  large array reference
+@* 1 typed    large array reference
+@* 1 untyped  small array reference
+@* 1 typed    small array reference
+@* 1 untyped  VLA reference
+@* 1 typed    VLA reference
+@* ===================
+   lprintf "Start of Test 20200506 - 1"
+
+   aos_get_bp_count( noref1_uid, ref_inst2_uid, aint)
+   check_variable aint 8
+   aos_update_bp_count( noref1_uid, ref_inst2_uid, 99) 
+   aos_get_bp_count( noref1_uid, ref_inst2_uid, aint)
+   check_variable aint 99
+
+@* Validate that the reference manager accurately counts references (1 in each attribute type)
+@* This test also demonstrates how reference manager actually finds and uses the correct class.
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class:" + noref1_uid
+   set_variable command string command + " -to=Reference_Test_Class:"
+   set_variable command string command + ref_inst2_uid
+   set_variable command string command + " -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   aos_get_bp_count( noref1_uid, ref_inst2_uid, aint)
+   check_variable aint 8
+
+@* ===================
+@* Test 20200506 - 2
+@* Test that -load_obj option can be used without -c option.
+   lprintf "Start of Test 20200506 - 2"
+   set_variable command string "reference_manager -load_obj -u=otto -p=matic -g=sys_admin -uid=" + noref1_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ===================
+@* Test 20200506 - 3
+@* Test that -find_ref will find references starting with a class that has not reference attributes.
+   lprintf "Start of Test 20200506 - 3"
+
+   set_variable command string "reference_manager -find_ref -u=otto -p=matic -g=sys_admin -v -o=No_Ref_Attrs_Class -uid=" + ref_inst2_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ===================
+@* Test 20200506 - 4
+@* Test that -find_ref will find references starting with a class that has reference attributes.
+   lprintf "Start of Test 20200506 - 4"
+
+   set_variable command string "reference_manager -find_ref -u=otto -p=matic -g=sys_admin -v -o=Reference_Test_Class -uid=" + ref_inst2_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ===================
+@* Test 20200506 - 5
+@* Test -correct_bp. This test will use the backpointer (from missing_lwo to ref_inst1) as a problem backpointer 
+@* between a deleted object and the ref_inst1 object. Because missing_lwo is a LWO the reference manager will 
+@* not find it in the PPOM_OBJECT table... and thus requiring the class (in the command line -from= parameter) to match 
+@* the POM_BACKPOINTER.from_class. 
+   lprintf "Start of Test 20200506 - 5"
+
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:" + missing_lwo_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + ref_inst1_uid
+   set_variable command string command + " -deleted -commit -aos=515033"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* Corrupt the backpointer and make it look like the source object has been deleted. 
+   AOS_utility_tx_start(1)
+   set_variable command string "UPDATE POM_BACKPOINTER SET from_class = to_class WHERE from_uid = '"
+   set_variable command string command + missing_lwo_uid
+   set_variable command string command + "' AND to_uid = '"
+   set_variable command string command + ref_inst1_uid
+   set_variable command string command + "'"
+   print_variable command
+   EIM_exec_imm( command, "Update from_class")
+   AOS_utility_tx_commit(1)
+   AOS_utility_tx_end(1)
+
+   aos_get_bp_count( missing_lwo_uid, ref_inst1_uid, aint )
+   check_variable aint 1
+
+@* Now delete a reference from an object that does not exist. 
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:" + missing_lwo_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + ref_inst1_uid
+   set_variable command string command + " -deleted -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2 )
+   print_variable command2
+   system command2
+
+   aos_get_bp_count( missing_lwo_uid, ref_inst1_uid, aint)
+   check_variable aint -1
+
+@* ===================
+@* Test 20200506 - 6
+@* Test -correct_bp. No we recreate the missing backpointer (from missing_lwo to ref_inst1) that we just 
+@* used as a dangling backpointer for a different object. 
+   lprintf "Start of Test 20200506 - 6"
+
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:" + missing_lwo_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + ref_inst1_uid
+   set_variable command string command + " -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   aos_get_bp_count( missing_lwo_uid, ref_inst1_uid, aint)
+   check_variable aint 1
+
+@* ===================
+@* Test 20200506 - 7
+@* Test -delete_obj. Simply demonstrate that the -delete_obj option will NOT delete an object when it is referenced from a POM_BACKPOINTER. 
+   lprintf "Start of Test 20200506 - 7"
+
+@*  Note:  POM_save_instance() above is NOT unlocking the ref_inst1, consequently
+@*         the following statement is needed in order for this test to pass. 
+   POM_refresh_instances (1, { ref_inst1 }, referenced_class, POM_no_lock)
+
+   if winnt eq "yes"
+      set_variable command string "reference_manager -delete_obj -u=otto -p=matic -g=sys_admin -lic_file=$LIC_FILE -c=Reference_Test_Class_2 -uid=" + ref_inst1_uid
+      set_variable command string command + " -commit"
+      set_variable command string command + " -aos=515110"
+       @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+       @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+      print_variable command2
+      system command2
+   endif 
+
+   lprintf "End of tests added on 20200506"
+@* End of tests added on 20200506
+@* ==============================
+
+@* ===================
+@* -add_ref testing
+@* ===================
+
+@* TEST -add_ref
+@* Validate that we can ROLLBACK an add a reference operation if -commit is not specified.
+   set_variable command string "reference_manager -add_ref -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:b_ut_ref_vla_999786:" + inst11_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -aos=515033"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ensure backpointer count was not increamented
+   aos_get_bp_count( inst11_uid, inst10_uid, aint)
+   check_variable aint orig_bp_count
+
+@* TEST -add_ref
+@* Validate that we can add a reference
+   set_variable command string "reference_manager -add_ref -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:b_ut_ref_vla_999786:" + inst11_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ensure backpointer count was increamented
+   set_variable add_ref_bp_count int 2
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint add_ref_bp_count
+
+@* TEST -add_ref - 20210701 
+@* Test adding a reference into an LWO reference attribute
+   set_variable command string "reference_manager -add_ref -u=otto -p=matic -g=sys_admin -from=Reference_Test_LWO_3:c_t_ref:" + inst_lwo_92_uid
+   set_variable command string command + " -to=Reference_Test_LWO_3:"
+   set_variable command string command + inst_lwo_91_uid
+   set_variable command string command + " -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2 
+
+@* ===================
+@* -correct_bp testing
+@* ===================
+
+@* mess up the backpointer count
+   set_variable final_bp_count int 99
+   aos_update_bp_count( inst11_uid, inst10_uid, final_bp_count) 
+
+@* ensure backpointer count was messed up
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint final_bp_count
+
+@* TEST #  -correct_bp
+@* Validate that the reference manager wont run (POM_op_not_supported) if database transactions are not available.
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:" + inst11_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -aos=515005"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   setenv                      TC_DISABLE_UTIL_TRANSACTIONS "true"
+   setenv                      TC_DISABLE_TRANSACTIONS "true"
+   system command2
+   unsetenv                    TC_DISABLE_UTIL_TRANSACTIONS
+   unsetenv                    TC_DISABLE_TRANSACTIONS
+@* ensure backpointer count is still messed up
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint final_bp_count
+   
+@* TEST #  -correct_bp
+@* Validate that the reference manager actually rollsback when -commit is NOT specified
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:" + inst11_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -aos=515033"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   setenv                      TC_DISABLE_UTIL_TRANSACTIONS "true"
+   setenv                      TC_ENABLE_TRANSACTIONS "true"   
+   system command2
+   unsetenv                    TC_DISABLE_UTIL_TRANSACTIONS
+   unsetenv                    TC_ENABLE_TRANSACTIONS 
+
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint final_bp_count
+
+@* TEST #  -correct_bp
+@* Validate that the reference manager actually adjusts the backpointer back to its original value
+   set_variable command string "reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:" + inst11_uid
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -commit"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint add_ref_bp_count 
+   
+@* TEST #  -correct_bp
+@* Validate that adding a reference with a no-backpointer has NO impact on how -correct_bp counts references  
+   POM_load_instances ( 1, { ref_inst11 } , referenced_class , POM_modify_lock )
+   POM_set_attr_tag   ( 1, { ref_inst11 }, b_t_nb_ref, ref_inst11 )
+   POM_save_instances ( 1, { ref_inst11 }, true )
+
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) ;
+   check_variable aint add_ref_bp_count 
+
+@* Modify the backpointer count again.
+   aos_update_bp_count( inst11_uid, inst10_uid, final_bp_count) 
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint final_bp_count
+   print_variable command2
+   system command2
+
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint add_ref_bp_count 
+
+@* ===================
+@* VLA scanning test all good data, no corruption
+@* ===================
+@* Validate that reference_manager can scan VLA reference attributes
+@* and correctly identify reference/backpointer consistency.
+
+   lprintf "Start of VLA scan test"
+
+   set_variable command string "reference_manager -scan_vla -u=otto -p=matic -g=sys_admin -c=Reference_Test_Class"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$', command, command2)
+   print_variable command2
+   system command2
+
+@* Scan VLA references for class with mixed VLA attributes
+   set_variable command string "reference_manager -scan_vla -u=otto -p=matic -g=sys_admin -c=Reference_Test_Class_2"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$', command, command2)
+   print_variable command2
+   system command2
+
+@* Scan VLA references for LWO class
+   set_variable command string "reference_manager -scan_vla -u=otto -p=matic -g=sys_admin -c=Reference_Test_LWO_3"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$', command, command2)
+   print_variable command2
+   system command2
+
+@* -------------------------------------------------
+@* Corrupt data: remove backpointers for a VLA attr
+@* -------------------------------------------------
+
+   set_variable sql_cmd string "
+DELETE FROM POM_BACKPOINTER
+ WHERE RATTR = 'a_ut_ref_vla';
+COMMIT;
+"
+
+@[ $OSFAMILY -in ( nt ) ] set_variable sql_exec string "sqlplus -s %TC_DB_USER%/%TC_DB_PASS%@%TC_DB_SID% << EOF
+${sql_cmd}
+EOF"
+
+@[ $OSFAMILY -in ( unix ) ] set_variable sql_exec string "sqlplus -s $TC_DB_USER/$TC_DB_PASS@$TC_DB_SID << EOF
+${sql_cmd}
+EOF"
+
+   print_variable sql_exec
+   system sql_exec
+
+   lprintf "Finished corrupting VLA backpointers"
+
+@* -------------------------------------------------
+@* Scan VLA – expect inconsistent results
+@* -------------------------------------------------
+
+   lprintf "Running scan_vla on corrupted data (expect inconsistencies)"
+
+   set_variable command string "reference_manager -scan_vla -u=otto -p=matic -g=sys_admin -c=Reference_Test_Class -debug"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$', command, command2)
+   print_variable command2
+   system command2
+
+
+   lprintf "End of VLA scan test"
+
+
+@* ===================
+@* -remove_ref testing
+@* ===================
+
+@* TEST -remove_ref
+@* Validate that we can rollback a reference removal when -commit is NOT specified
+   set_variable command string "reference_manager -remove_ref -u=otto -p=matic -g=sys_admin -from=Reference_Test_Class_2:b_ut_ref_vla_999786:" + inst11_uid
+   set_variable command string command + ":0"
+   set_variable command string command + " -to=Reference_Test_Class_2:"
+   set_variable command string command + inst10_uid
+   set_variable command string command + " -aos=515033"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ensure backpointer count was unchanged.
+   set_variable remove_ref_bp_count int 1
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint add_ref_bp_count
+
+@* TEST -remove_ref
+@* Validate that we can remove a reference
+   if winnt eq "yes"
+      set_variable command string "reference_manager -remove_ref -u=otto -p=matic -g=sys_admin -lic_file=$LIC_FILE -from=Reference_Test_Class_2:b_ut_ref_vla_999786:" + inst11_uid
+      set_variable command string command + ":0"
+      set_variable command string command + " -to=Reference_Test_Class_2:"
+      set_variable command string command + inst10_uid
+      set_variable command string command + " -commit"
+      print_variable command
+      system command
+  endif 
+
+  if winnt eq "no"
+      @* Since this is not windows we'll just remove the reference
+      POM_load_instances ( 1, {ref_inst11}, referenced_class, POM_modify_lock )
+	  POM_set_attr_tags  ( 1, {ref_inst11}, b_ut_ref_vla_999786, 0, 1, { null_tag} )
+	  POM_save_instances ( 1, {ref_inst11}, true )
+  endif
+
+@* ensure backpointer count was decreamented
+   set_variable remove_ref_bp_count int 1
+   aos_get_bp_count( inst11_uid, inst10_uid, aint) 
+   check_variable aint remove_ref_bp_count
+
+@* TEST -remove_ref - 20210701 
+@* Test removal of reference from LWO reference attribute
+   if winnt eq "yes"
+      set_variable command string "reference_manager -remove_ref -u=otto -p=matic -g=sys_admin -lic_file=$LIC_FILE -from=Reference_Test_LWO_3:c_t_ref:" + inst_lwo_91_uid
+      set_variable command string command + " -to=Reference_Test_LWO_3:"
+      set_variable command string command + inst_lwo_92_uid
+      set_variable command string command + " -commit"
+      print_variable command
+      system command
+  endif 
+
+@* ===================
+@* -load_obj testing
+@* ===================
+
+@* TEST -load_obj
+@* Validate that we can load a specified object
+   set_variable command string "reference_manager -load_obj -u=otto -p=matic -g=sys_admin -uid=" + inst11_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ===================
+@* -delete_obj testing
+@* ===================
+
+@* TEST -delete_obj
+@* Validate that we can "test" drop an object and then rollback the changes
+   set_variable command string "reference_manager -delete_obj -u=otto -p=matic -g=sys_admin -c=Reference_Test_Class_2 -uid=" + inst11_uid
+   set_variable command string command + " -aos=515033"
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* We should be able to load the object that was not deleted.
+   POM_load_instances ( 1, {ref_inst11}, referenced_class, POM_no_lock)
+
+@* TEST -delete_obj
+@* Validate that we can't drop an object that is referenced.
+   if winnt eq "yes"
+      set_variable command string "reference_manager -delete_obj -u=otto -p=matic -g=sys_admin -lic_file=$LIC_FILE -c=Reference_Test_Class_2 -uid=" + inst10_uid
+      set_variable command string command + " -commit"
+      set_variable command string command + " -aos=515110"
+      print_variable command
+      system command
+   endif 
+
+@* We should be able to load the object that was not deleted.
+   POM_load_instances ( 1, {ref_inst10}, referenced_class, POM_no_lock)
+
+@* TEST -delete_obj
+@* Validate that we can actually drop an instance.
+   if winnt eq "yes"
+      set_variable command string "reference_manager -delete_obj -u=otto -p=matic -g=sys_admin -lic_file=$LIC_FILE -c=referenced_class -uid=" + inst19_uid
+      set_variable command string command + " -commit"
+      print_variable command
+      system command
+   endif
+
+   if winnt eq "no"
+      @* Since this is not windows we'll just delete the object
+      POM_load_instances ( 1, {ref_inst19}, referenced_class, POM_delete_lock)
+	  POM_delete_instances ( 1, {ref_inst19} )
+   endif
+
+@* We should not be able to load the object that was deleted.
+   ifail_expected POM_invalid_tag                     
+   POM_load_instances ( 1, {ref_inst19}, referenced_class, POM_no_lock)
+
+
+@* ======================
+@* -find_ext_ref testing
+@* ======================
+@* Validate that we can actually find an external refernce.
+   set_variable command string "reference_manager -find_ext_ref -u=otto -p=matic -g=sys_admin -uid=" + ref_inst1_uid
+   @[ $OSFAMILY -in ( nt ) ] set_variable command2 string command
+   @[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  command, command2)
+   print_variable command2
+   system command2
+
+@* ------------------------------------------------
+@* Uncomment the following command to setup your enviornment for manual testing.
+@* 
+@*   POM_stop (true)
+@*   stop
+@*   POM_start_modify (HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version)
+@*   POM_class_id_of_class ("POM_application_object", the_world)
+@* ------------------------------------------------
+
+@*
+@* Clean u
+@* 
+
+   POM_class_id_of_class  ( 'No_Ref_Attrs_Class', no_ref_class )
+   POM_instances_of_class ( no_ref_class, true, n, insts)
+   POM_delete_instances   ( n, insts)
+   POM_remove_class       ( no_ref_class )
+
+   POM_class_id_of_class  ( 'Reference_Test_LWO_3', new_lwo_3 )
+   POM_instances_of_class ( new_lwo_3, true, n, insts)
+   POM_delete_instances   ( n, insts)
+   POM_remove_class       ( new_lwo_3 )
+
+   POM_class_id_of_class  ( 'Reference_Test_Class', new_class )
+   POM_instances_of_class ( new_class, true, n, insts)
+   POM_delete_instances   ( n, insts)
+   POM_remove_class       ( new_class )
+
+   POM_class_id_of_class  ( 'Reference_Test_Class_2', referenced_class )
+   POM_instances_of_class ( referenced_class, true, n, insts)
+   POM_delete_instances   ( n, insts)
+   POM_remove_class       ( referenced_class )
+
+   POM_stop (true)
+   system "install -regen_schema_file -u=otto -p=matic -g=sys_admin"
+   stop

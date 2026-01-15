@@ -1,0 +1,172 @@
+@* @<COPYRIGHT>@
+@*=============================================================================
+@* Copyright 2017.
+@* Siemens Product Lifecycle Management Software Inc.
+@* All Rights Reserved.
+@*=============================================================================
+@* @<COPYRIGHT>@
+@*
+@* File description: Test Reference Manager functionality.
+@*                   1) Testing -correct_bp option works with a flattened class. 
+@*                   2) Testing -correct_bp options works when the object class does NOT contain any reference attributes. 
+@*
+@*=================================================================================================================================
+@* Date         Name                    Description of Change
+@*
+@* 16-Jul-2022  Tim Slechta             Initial version
+@* $HISTORY$
+@*=================================================================================================================================
+POM_start_modify            ( HARDCODED_SYSADMIN_USER, HARDCODED_SYSADMIN_PASSWORD, HARDCODED_SYSADMIN_GROUP, user_tag, the_world, version )
+POM_class_id_of_class       ( 'POM_object', po_c_tag)
+
+create_unique_classname     l1_class_name RF_MGR_FLT_NO_REF_L1
+POM_define_class            ( po_c_tag,   l1_class_name,  "", 0, l1_class )
+POM_define_attr             ( l1_class,  "l1_ut_ref",      POM_untyped_reference,  0, NULLCLASS, 1,  0, l1_ut_ref )
+POM_define_attr             ( l1_class,  "l1_string",      POM_string,            32, NULLCLASS, 1,  0, l1_string )
+POM_save_class              ( l1_class )
+
+create_unique_classname     l2_class_name RF_MGR_FLT_NO_REF_L2
+POM_define_class            ( l1_class, l2_class_name,  "", 0, l2_class )
+POM_define_attr             ( l2_class, "l2_ut_ref",      POM_untyped_reference,  0, NULLCLASS, 1,  0, l2_ut_ref )
+POM_define_attr             ( l2_class, "l2_string",      POM_string,            32, NULLCLASS, 1,  0, l2_string )
+POM_save_class              ( l2_class )
+
+@* Flattened class with no references.
+create_unique_classname     l3_class_name RF_MGR_FLT_NO_REF_L3
+POM_define_class            ( l2_class, l3_class_name,  "", 65536, l3_class )
+@* POM_define_attr          ( l3_class, "l3_ut_ref",      POM_untyped_reference,  0, NULLCLASS, 1,  0, l3_ut_ref )
+POM_define_attr             ( l3_class, "l3_string",      POM_string,            32, NULLCLASS, 1,  0, l3_string )
+POM_save_class              ( l3_class )
+
+@* Normal class with no references.
+create_unique_classname     l4_class_name RF_MGR_FLT_NO_REF_L4
+POM_define_class            ( l2_class, l4_class_name,  "", 0, l4_class )
+@* POM_define_attr          ( l4_class, "l4_ut_ref",      POM_untyped_reference,  0, NULLCLASS, 1,  0, l4_ut_ref )
+POM_define_attr             ( l4_class, "l4_string",      POM_string,            32, NULLCLASS, 1,  0, l4_string )
+POM_save_class              ( l4_class )
+
+@* create target object.
+create_unique_classname     class_name RF_MGR_TARGET
+AOS_create_GEN_class        ( class_name, 'null', 1, true, n_groupa, groupa );
+set_variable target tag     groupa[0]
+
+@* Create objects with references 
+POM_create_instance         ( l3_class, inst1 )
+POM_set_attr_string         ( 1, { inst1 }, l1_string, 'Level 1' )
+POM_set_attr_tag            ( 1, { inst1 }, l1_ut_ref,  target   )
+POM_set_attr_string         ( 1, { inst1 }, l2_string, 'Level 2' )
+POM_set_attr_tag            ( 1, { inst1 }, l2_ut_ref,  target   )
+POM_set_attr_string         ( 1, { inst1 }, l3_string, 'Level 3' )
+POM_save_instances          ( 1, { inst1 }, true )
+
+POM_create_instance         ( l4_class, inst2 )
+POM_set_attr_string         ( 1, { inst2 }, l1_string, 'Level 1' )
+POM_set_attr_tag            ( 1, { inst2 }, l1_ut_ref,  target   )
+POM_set_attr_string         ( 1, { inst2 }, l2_string, 'Level 2' )
+POM_set_attr_tag            ( 1, { inst2 }, l2_ut_ref,  target   )
+POM_set_attr_string         ( 1, { inst2 }, l4_string, 'Level 4' )
+POM_save_instances          ( 1, { inst2 }, true )
+
+POM_tag_to_uid              ( inst1, inst1_uid )
+POM_tag_to_uid              ( inst2, inst2_uid )
+POM_tag_to_uid              ( target, target_uid )
+
+@* setup for testing CPIDs rather than class names as input parameters.
+POM_class_to_cpid           ( l3_class, temp_int )
+AOS_int_to_string           ( temp_int, l3_cpid )
+POM_class_to_cpid           ( l4_class, temp_int )
+AOS_int_to_string           ( temp_int, l4_cpid )
+
+POM_class_id_of_class       ( class_name, target_cls_tag)
+POM_class_to_cpid           ( target_cls_tag, temp_int )
+AOS_int_to_string           ( temp_int, target_cpid )
+
+@* 
+@* Test counting references on a flattened class containing no references (references are on the parent classes). 
+@*
+set_variable sql string "UPDATE POM_BACKPOINTER set bp_count = 99 WHERE from_uid = '"
+set_variable sql string sql + inst1_uid
+set_variable sql string sql + "' AND to_uid = '"
+set_variable sql string sql + target_uid
+set_variable sql string sql + "'"
+
+lprintf sql
+print_variable sql
+AOS_utility_tx_start        ( 1 )
+EIM_exec_imm                ( sql, "set bp_count = 99" )
+AOS_utility_tx_commit       ( 1 )
+AOS_utility_tx_end          ( 1 )
+
+AOS_get_bp_count            ( inst1_uid, target_uid, bp_count )
+check_variable              bp_count 99
+
+set_variable cmd string     'reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from='
+@* set_variable cmd string  cmd + l3_class_name 
+set_variable cmd string     cmd + l3_cpid 
+set_variable cmd string     cmd + ":"
+set_variable cmd string     cmd + inst1_uid 
+set_variable cmd string     cmd + " -to="
+@* set_variable cmd string  cmd + class_name 
+set_variable cmd string     cmd + target_cpid 
+set_variable cmd string     cmd + ":"
+set_variable cmd string     cmd + target_uid 
+set_variable cmd string     cmd + " -commit"
+@[ $OSFAMILY -in ( nt ) ]   set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+AOS_get_bp_count            ( inst1_uid, target_uid, bp_count )
+check_variable              bp_count 2
+
+
+@* 
+@* Test counting references on a normal class containing no references (references are on the parent classes). 
+@*
+set_variable sql string "UPDATE POM_BACKPOINTER set bp_count = 99 WHERE from_uid = '"
+set_variable sql string sql + inst2_uid
+set_variable sql string sql + "' AND to_uid = '"
+set_variable sql string sql + target_uid
+set_variable sql string sql + "'"
+
+lprintf sql
+print_variable sql
+AOS_utility_tx_start        ( 1 )
+EIM_exec_imm                ( sql, "set bp_count = 99" )
+AOS_utility_tx_commit       ( 1 )
+AOS_utility_tx_end          ( 1 )
+
+AOS_get_bp_count            ( inst2_uid, target_uid, bp_count )
+check_variable              bp_count 99
+
+set_variable cmd string     'reference_manager -correct_bp -u=otto -p=matic -g=sys_admin -from='
+set_variable cmd string     cmd + l4_class_name 
+set_variable cmd string     cmd + ":"
+set_variable cmd string     cmd + inst2_uid 
+set_variable cmd string     cmd + " -to="
+set_variable cmd string     cmd + class_name 
+set_variable cmd string     cmd + ":"
+set_variable cmd string     cmd + target_uid 
+set_variable cmd string     cmd + " -commit"
+@[ $OSFAMILY -in ( nt ) ]   set_variable cmd2 string cmd
+@[ $OSFAMILY -in ( unix ) ] AOS_escape_char('\\', '$',  cmd, cmd2)
+print_variable cmd2
+system cmd2
+
+AOS_get_bp_count            ( inst2_uid, target_uid, bp_count )
+check_variable              bp_count 2
+
+@*
+@* Cleanup and get out.
+@*
+
+AOS_drop_GEN_class          ( l4_class_name )
+AOS_drop_GEN_class          ( l3_class_name )
+AOS_drop_GEN_class          ( l2_class_name )
+AOS_drop_GEN_class          ( l1_class_name )
+AOS_drop_GEN_class          ( class_name )
+
+POM_stop (true)
+stop
+
+

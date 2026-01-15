@@ -1,0 +1,187 @@
+@*=================================================================================================================================
+@*
+@*                    Copyright(c) 2023 Siemens Corporation
+@*                    Unpublished - All rights reserved
+@*
+@*=================================================================================================================================
+@* File description:
+@*
+@* Tests reference manager's search for problem backpointers (-validate_pb2)
+@*
+@*=================================================================================================================================
+timing on
+set_variable usr string 'otto'
+set_variable pwd string 'matic'
+set_variable grp string 'sys_admin'
+POM_start_modify( usr, pwd, grp )
+
+@* -- Create target (referenced) objects 
+create_unique_classname target_class RM_TRG_VALIDATE_BP2
+AOS_create_GEN_class    ( target_class, 'null', 5, true, n_groupa, groupa )
+
+set_variable tar0 tag groupa[0]
+set_variable tar1 tag groupa[1]
+set_variable tar2 tag groupa[2]
+set_variable tar3 tag groupa[3]
+
+@* -- Create Class
+create_unique_classname rm_val_bp_class RM_VALIDATE_BP2
+POM_class_id_of_class   ( "POM_application_object", pao_id)
+POM_define_class        ( pao_id,  rm_val_bp_class, "", 0, rm_cid )
+POM_define_attr         ( rm_cid, 'rf',       POM_untyped_reference, 0, null_tag,  1, POM_null_is_valid, rf_id)
+POM_define_attr         ( rm_cid, 'vla_rf',   POM_untyped_reference, 0, null_tag, -1, POM_null_is_valid, vla_rf_id)
+POM_define_attr         ( rm_cid, 'la_rf',    POM_untyped_reference, 0, null_tag,  7, POM_null_is_valid, la_rf_id)
+POM_define_attr         ( rm_cid, 'sa_rf',    POM_untyped_reference, 0, null_tag,  6, POM_null_is_valid, sa_rf_id)
+POM_save_class          ( rm_cid )
+
+@* -- Create instance
+POM_create_instance     ( rm_cid, inst1)
+POM_set_attr_null       ( 1, {inst1}, rf_id )
+POM_set_attr_nulls      ( 1, {inst1}, la_rf_id, 0, 7 )
+POM_set_attr_nulls      ( 1, {inst1}, sa_rf_id, 0, 6 )
+
+POM_set_attr_tag        ( 1, {inst1}, rf_id, tar0)
+POM_set_attr_tags       ( 1, {inst1}, vla_rf_id, 0, 1, tar0) 
+POM_set_attr_tags       ( 1, {inst1}, vla_rf_id, 1, 1, tar1) 
+POM_set_attr_tags       ( 1, {inst1}, sa_rf_id,  0, 1, tar2) 
+POM_set_attr_tags       ( 1, {inst1}, la_rf_id,  0, 1, tar3) 
+POM_save_instances      ( 1, {inst1},  true ) 
+
+POM_class_to_cpid       ( rm_cid, rm_cpid )
+AOS_int_to_string       ( rm_cpid, rm_cpid_str )
+POM_tag_to_uid          ( inst1, inst1_uid )
+POM_tag_to_uid          ( tar0, tar0_uid )
+POM_tag_to_uid          ( tar1, tar1_uid )
+POM_tag_to_uid          ( tar2, tar2_uid )
+
+
+@*
+@* Run reference manager to validate that it can process all attribute types without a problem. 
+@*
+@* Note: if ref-mgr finds more than zero problems (-cnt=0) it will err.
+@*
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -cnt=0 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+@* 
+@* Insert an unneed backpointer record into the POM_BACKPOINTER table.
+@*
+set_variable            sql string "INSERT INTO POM_BACKPOINTER (from_uid, from_class, to_uid, to_class, bp_count ) VALUES ('" + inst1_uid 
+set_variable            sql string sql + "', "
+set_variable            sql string sql + rm_cpid_str 
+set_variable            sql string sql + ", 'SlechtaSlecht!', 1, 99)"
+print_variable          sql
+AOS_utility_tx_start    ( 1 )
+EIM_exec_imm            ( sql, "Insert unneeded backpointer into POM_BACKPOINTER table")
+AOS_utility_tx_commit   ( 1 )
+AOS_utility_tx_end      ( 1 )
+
+@*
+@* Run reference manager to detect an unneeded backpointer 
+@*
+@* Note: if ref-mgr does not fine exactly 1 problem (-cnt=1) it will err.
+@*
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -cnt=1 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -log_details -cnt=1 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+@* 
+@* Remove one of the backpointers.
+@*
+set_variable            sql string "DELETE FROM POM_BACKPOINTER WHERE from_uid = '" + inst1_uid
+set_variable            sql string sql + "' AND to_uid = '"
+set_variable            sql string sql + tar1_uid 
+set_variable            sql string sql + "'"
+print_variable          sql
+AOS_utility_tx_start    ( 1 )
+EIM_exec_imm            ( sql, "Delete existing backpointer")
+AOS_utility_tx_commit   ( 1 )
+AOS_utility_tx_end      ( 1 )
+
+@*
+@* Run reference manager to detect a missing backpointer  
+@*
+@* Note: if ref-mgr does not fine exactly 2 problems (-cnt=2) it will err.
+@*
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -cnt=2 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -log_details -cnt=2 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+@* 
+@* Reduce the backpointer count.
+@*
+set_variable            sql string "UPDATE POM_BACKPOINTER set bp_count = bp_count - 1 WHERE from_uid = '" + inst1_uid
+set_variable            sql string sql + "' AND to_uid = '"
+set_variable            sql string sql + tar0_uid 
+set_variable            sql string sql + "'"
+print_variable          sql
+AOS_utility_tx_start    ( 1 )
+EIM_exec_imm            ( sql, "Reduce the backpointer count by 1")
+AOS_utility_tx_commit   ( 1 )
+AOS_utility_tx_end      ( 1 )
+
+@*
+@* Run reference manager to detect a bad backpointer count  
+@*
+@* Note: if ref-mgr does not fine exactly 3 problems (-cnt=3) it will err.
+@*
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -cnt=3 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -log_details -cnt=3 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+@* 
+@* Change the from_class CPID.
+@*
+set_variable            sql string "UPDATE POM_BACKPOINTER set from_class = from_class - 1 WHERE from_uid = '" + inst1_uid
+set_variable            sql string sql + "' AND to_uid = '"
+set_variable            sql string sql + tar2_uid 
+set_variable            sql string sql + "'"
+print_variable          sql
+AOS_utility_tx_start    ( 1 )
+EIM_exec_imm            ( sql, "Reduce from_class value by 1")
+AOS_utility_tx_commit   ( 1 )
+AOS_utility_tx_end      ( 1 )
+
+@*
+@* Run reference manager to detect a bad from_class value  
+@*
+@* Note: if ref-mgr does not fine exactly 4 problems (-cnt=4) it will err.
+@*
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -cnt=4 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+set_variable cmd string 'reference_manager -validate_bp2 -u=otto -p=matic -g=sys_admin -log_details -cnt=4 -c='
+set_variable cmd string cmd + rm_val_bp_class
+print_variable cmd
+system cmd
+
+@* -- Cleanup and get out.
+print_variable rm_val_bp_class
+print_variable target_class
+AOS_drop_GEN_class               (rm_val_bp_class)
+AOS_drop_GEN_class               (target_class)
+
+POM_stop( true )
+stop
